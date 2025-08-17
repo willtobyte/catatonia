@@ -18,6 +18,18 @@ ION_P="${ION_P:-7}"
 
 export THREADS NICE ION_C ION_P
 
+find . -type f \( -iname '*.wav' -o -iname '*.flac' \) -print0 \
+| xargs -0 -P "${JOBS:-1}" -I{} bash -c '
+  [ -f "$1" ] || exit 0
+  ffmpeg -hide_banner -loglevel error -y \
+    -i "$1" \
+    -map 0:a:0 -vn -map_metadata -1 -map_chapters -1 \
+    -c:a libvorbis -q:a 2 -ar 44100 \
+    "${1%.*}.ogg.tmp"
+  mv -f "${1%.*}.ogg.tmp" "${1%.*}.ogg"
+  rm -f -- "$1"
+' _ {}
+
 find . -type f \( -iname '*.png' -o -iname '*.apng' \) -print0 \
 | xargs -0 -r -n1 -P "$JOBS" -I{} bash -c '
   set -euo pipefail
