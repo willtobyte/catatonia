@@ -9,8 +9,6 @@ cargo install stylua --features luajit --root /usr/local
 npm install --location=global prettier
 EOF
 
-ENV PATH="/root/.cargo/bin:${PATH}"
-
 WORKDIR /opt
 COPY main.sh .
 RUN chmod +x main.sh
