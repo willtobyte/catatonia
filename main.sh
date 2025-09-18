@@ -24,16 +24,22 @@ find . -type f \( -iname '*.wav' -o -iname '*.flac' \) -print0 \
   [ -f "$f" ] || exit 0
 
   out="${f%.*}.ogg"
-  tmp="${out}.$$.tmp"
+  tmp="${out}.tmp"
+
+  # limpa temporário em qualquer erro/interrupção
+  cleanup() { rm -f -- "$tmp"; }
+  trap cleanup EXIT
 
   ffmpeg -hide_banner -loglevel error -y \
     -i "$f" \
     -map 0:a:0 -vn -map_metadata -1 -map_chapters -1 \
     -c:a libvorbis -q:a 2 -ar 44100 \
+    -f ogg \
     "$tmp" \
-  || { rm -f -- "$tmp"; exit 1; }
+  || exit 1
 
   mv -f -- "$tmp" "$out"
+  trap - EXIT
   touch -r "$f" "$out" 2>/dev/null || true
   rm -f -- "$f"
 ' _ {}
