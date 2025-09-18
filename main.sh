@@ -26,7 +26,6 @@ find . -type f \( -iname '*.wav' -o -iname '*.flac' \) -print0 \
   out="${f%.*}.ogg"
   tmp="${out}.tmp"
 
-  # limpa temporário em qualquer erro/interrupção
   cleanup() { rm -f -- "$tmp"; }
   trap cleanup EXIT
 
