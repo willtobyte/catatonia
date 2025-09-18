@@ -19,28 +19,51 @@ ION_P="${ION_P:-7}"
 export THREADS NICE ION_C ION_P
 
 find . -type f \( -iname '*.wav' -o -iname '*.flac' \) -print0 \
-| xargs -0 -P "${JOBS:-1}" -I{} bash -c '
-  [ -f "$1" ] || exit 0
+| xargs -0 -r -P "${JOBS:-1}" -I{} bash -Eeuo pipefail -c '
+  f=$1
+  [ -f "$f" ] || exit 0
+
+  out="${f%.*}.ogg"
+  tmp="${out}.$$.tmp"
+
   ffmpeg -hide_banner -loglevel error -y \
-    -i "$1" \
+    -i "$f" \
     -map 0:a:0 -vn -map_metadata -1 -map_chapters -1 \
     -c:a libvorbis -q:a 2 -ar 44100 \
-    "${1%.*}.ogg.tmp"
-  mv -f "${1%.*}.ogg.tmp" "${1%.*}.ogg"
-  rm -f -- "$1"
+    "$tmp" \
+  || { rm -f -- "$tmp"; exit 1; }
+
+  mv -f -- "$tmp" "$out"
+  touch -r "$f" "$out" 2>/dev/null || true
+  rm -f -- "$f"
 ' _ {}
 
 find . -type f \( -iname '*.png' -o -iname '*.apng' \) -print0 \
-| xargs -0 -r -n1 -P "$JOBS" -I{} bash -c '
-  set -euo pipefail
-  f="$1"
-  cmd=(oxipng -o max --strip all --threads "$THREADS" "$f")
+| xargs -0 -r -n1 -P "${JOBS:-1}" -I{} bash -Eeuo pipefail -c '
+  f=$1
+  [ -f "$f" ] || exit 0
+
+  dir=$(dirname -- "$f")
+  tmp="$dir/.oxipng.$$.$RANDOM.tmp"
+
+  # Preserva mtime do original
+  mtime=$(date -r "$f" +%s 2>/dev/null || printf 0)
+
+  cmd=(oxipng -o max --strip all --threads "${THREADS:-0}" --out "$tmp" "$f")
 
   if command -v ionice >/dev/null 2>&1; then
-    ionice -c "$ION_C" -n "$ION_P" "${cmd[@]}" && exit 0
+    ionice -c "${ION_C:-2}" -n "${ION_P:-7}" "${cmd[@]}" \
+    || { rm -f -- "$tmp"; exit 1; }
+    mv -f -- "$tmp" "$f"
+    [ "$mtime" -gt 0 ] && touch -d "@$mtime" -- "$f" 2>/dev/null || true
+    exit 0
   fi
 
-  nice -n "$NICE" "${cmd[@]}"
+  nice -n "${NICE:-10}" "${cmd[@]}" \
+  || { rm -f -- "$tmp"; exit 1; }
+
+  mv -f -- "$tmp" "$f"
+  [ "$mtime" -gt 0 ] && touch -d "@$mtime" -- "$f" 2>/dev/null || true
 ' _ {}
 
 find . -type f \( -iname '*.html' -o -iname '*.css' -o -iname '*.js' -o -iname '*.json' -o -iname '*.yaml' -o -iname '*.yml' \) -print0 \
