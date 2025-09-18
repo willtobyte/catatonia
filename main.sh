@@ -46,7 +46,6 @@ find . -type f \( -iname '*.png' -o -iname '*.apng' \) -print0 \
   dir=$(dirname -- "$f")
   tmp="$dir/.oxipng.$$.$RANDOM.tmp"
 
-  # Preserva mtime do original
   mtime=$(date -r "$f" +%s 2>/dev/null || printf 0)
 
   cmd=(oxipng -o max --strip all --threads "${THREADS:-0}" --out "$tmp" "$f")
